@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  rudeai-bot-test:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - DATABASE_URL=sqlite:///test_rudeai_bot.db
+      - WEBHOOK_URL=http://localhost:8000
+      - WEBHOOK_SECRET=test_webhook_secret_123456789
+      - OPENAI_API_KEY=your_openai_api_key_here
+      - TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
+      - LOG_LEVEL=DEBUG
+      - RATE_LIMIT_PER_MINUTE=100
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - rudeai-test-network
+    command: ["python", "-m", "uvicorn", "rudeai_bot.webhook_server:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+networks:
+  rudeai-test-network:
+    driver: bridge

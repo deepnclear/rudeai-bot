@@ -1,0 +1,1 @@
+web: python -m uvicorn rudeai_bot.webhook_server:app --host 0.0.0.0 --port $PORT

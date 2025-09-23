@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  rudeai-bot-dev:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - DATABASE_URL=sqlite:///rudeai_bot_dev.db
+    env_file:
+      - .env.dev
+    volumes:
+      - .:/app
+      - ./logs:/app/logs
+    networks:
+      - rudeai-dev-network
+    command: ["python", "-m", "uvicorn", "rudeai_bot.webhook_server:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+networks:
+  rudeai-dev-network:
+    driver: bridge

@@ -1,0 +1,14 @@
+[phases.setup]
+nixPkgs = ["python39", "curl"]
+
+[phases.install]
+cmd = "pip install -r requirements.txt"
+
+[phases.build]
+cmd = "echo 'Build phase complete'"
+
+[start]
+cmd = "python -m uvicorn rudeai_bot.webhook_server:app --host 0.0.0.0 --port $PORT"
+
+[variables]
+NIXPACKS_METADATA = "python"
