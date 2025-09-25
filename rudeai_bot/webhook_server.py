@@ -44,8 +44,13 @@ class WebhookServer:
 
     def setup_database(self):
         """Initialize database tables"""
-        Base.metadata.create_all(bind=engine)
-        logger.info("Database tables created successfully")
+        try:
+            logger.info(f"Connecting to database: {settings.database_url[:50]}...")
+            Base.metadata.create_all(bind=engine)
+            logger.info("✅ Database tables created successfully")
+        except Exception as e:
+            logger.error(f"❌ Database setup failed: {e}")
+            raise
 
     def setup_telegram_app(self) -> Application:
         """Setup Telegram application with handlers"""
@@ -238,16 +243,32 @@ class WebhookServer:
     async def startup(self):
         """Initialize the webhook server"""
         setup_logging()
-        logger.info("Starting RUDE.AI Webhook Server...")
+        logger.info("🚀 Starting RUDE.AI Webhook Server...")
 
-        self.telegram_app = self.setup_telegram_app()
-        await self.telegram_app.initialize()
-        await self.telegram_app.start()
+        # Log environment info
+        logger.info(f"🌍 Environment: {settings.environment}")
+        logger.info(f"🌐 Railway Domain: {os.environ.get('RAILWAY_PUBLIC_DOMAIN', 'Not detected')}")
+        logger.info(f"🔧 Port: {os.environ.get('PORT', 'Not set')}")
+        logger.info(f"🔑 OpenAI Model: {settings.openai_model}")
 
-        # Set up webhook
-        await self.setup_webhook()
+        try:
+            self.telegram_app = self.setup_telegram_app()
+            logger.info("✅ Telegram app configured")
 
-        logger.info("Webhook server is ready!")
+            await self.telegram_app.initialize()
+            logger.info("✅ Telegram app initialized")
+
+            await self.telegram_app.start()
+            logger.info("✅ Telegram app started")
+
+            # Set up webhook
+            await self.setup_webhook()
+            logger.info("✅ Webhook configured")
+
+            logger.info("🎉 Webhook server is ready!")
+        except Exception as e:
+            logger.error(f"❌ Startup failed: {e}")
+            raise
 
     async def shutdown(self):
         """Cleanup on shutdown"""
