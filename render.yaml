@@ -1,0 +1,43 @@
+services:
+  # Web Service (your Telegram bot)
+  - type: web
+    name: rudeai-bot
+    runtime: python3
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m uvicorn rudeai_bot.webhook_server:app --host 0.0.0.0 --port $PORT
+    plan: free
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: false
+      - key: HOST
+        value: 0.0.0.0
+      - key: OPENAI_MODEL
+        value: gpt-4o-mini
+      - key: OPENAI_MAX_TOKENS
+        value: 40
+      - key: OPENAI_TEMPERATURE
+        value: 0.7
+      - key: RATE_LIMIT_PER_MINUTE
+        value: 20
+      - key: MAX_MESSAGE_LENGTH
+        value: 1000
+      - key: LOG_LEVEL
+        value: INFO
+      - key: ENABLE_METRICS
+        value: true
+      - key: METRICS_RETENTION_DAYS
+        value: 7
+    # These will be set in Render dashboard:
+    # - OPENAI_API_KEY (secret)
+    # - TELEGRAM_BOT_TOKEN (secret)
+    # - WEBHOOK_SECRET (secret)
+    # - DATABASE_URL (auto-generated from database)
+
+databases:
+  # PostgreSQL Database (90 days free)
+  - name: rudeai-bot-db
+    plan: free
+    databaseName: rudeai_bot
+    user: rudeai_user

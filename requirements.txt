@@ -8,6 +8,7 @@ pydantic==2.9.2
 pydantic-settings==2.5.2
 loguru==0.7.2
 tenacity==9.0.0
+APScheduler==3.10.4
 
 # Web framework and server
 fastapi==0.110.0

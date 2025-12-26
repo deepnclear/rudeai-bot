@@ -103,7 +103,8 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-.env
+.env*
+!.env.example
 .venv
 env/
 venv/
@@ -143,6 +144,14 @@ cython_debug/
 
 # Project specific
 *.db
+test_*.db
 rudeai_bot.db
 logs/
 *.log
+
+# Binaries and archives
+ngrok
+ngrok.zip
+*.zip
+*.tar.gz
+*.exe

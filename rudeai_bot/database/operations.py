@@ -89,3 +89,108 @@ class DatabaseOperations:
 
     def get_user_by_telegram_id(self, telegram_id: int) -> Optional[User]:
         return self.db.query(User).filter(User.telegram_id == telegram_id).first()
+
+    # Task Management Operations
+
+    def create_task(self, user_id: int, name: str, hate_level: int, priority: int):
+        """Create a new task"""
+        from rudeai_bot.models.task import Task, TaskStatus
+
+        task = Task(
+            user_id=user_id,
+            name=name,
+            hate_level=max(1, min(5, hate_level)),  # Clamp to 1-5
+            priority=max(1, min(5, priority)),  # Clamp to 1-5
+            status=TaskStatus.active
+        )
+
+        try:
+            self.db.add(task)
+            self.db.commit()
+            self.db.refresh(task)
+            logger.info(f"Created task {task.id} for user {user_id}")
+            return task
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"Error creating task: {e}")
+            raise
+
+    def get_active_tasks(self, user_id: int) -> list:
+        """Get all active tasks for a user, ordered by priority (high to low) then hate_level"""
+        from rudeai_bot.models.task import Task, TaskStatus
+
+        return (
+            self.db.query(Task)
+            .filter(Task.user_id == user_id, Task.status == TaskStatus.active)
+            .order_by(Task.priority.desc(), Task.hate_level.desc())
+            .all()
+        )
+
+    def get_task_by_id(self, task_id: int, user_id: int) -> Optional:
+        """Get a specific task by ID for a user"""
+        from rudeai_bot.models.task import Task
+
+        return (
+            self.db.query(Task)
+            .filter(Task.id == task_id, Task.user_id == user_id)
+            .first()
+        )
+
+    def complete_task(self, task_id: int, user_id: int) -> Optional:
+        """Mark a task as completed"""
+        from rudeai_bot.models.task import Task, TaskStatus
+        from datetime import datetime, timezone
+
+        task = self.get_task_by_id(task_id, user_id)
+        if task and task.status == TaskStatus.active:
+            task.status = TaskStatus.completed
+            task.completed_at = datetime.now(timezone.utc)
+            self.db.commit()
+            self.db.refresh(task)
+            logger.info(f"Completed task {task_id} for user {user_id}")
+            return task
+        return None
+
+    def get_task_stats(self, user_id: int) -> dict:
+        """Get task statistics for a user"""
+        from rudeai_bot.models.task import Task, TaskStatus
+        from sqlalchemy import func as sql_func
+
+        # Count by status
+        completed_count = (
+            self.db.query(sql_func.count(Task.id))
+            .filter(Task.user_id == user_id, Task.status == TaskStatus.completed)
+            .scalar() or 0
+        )
+
+        expired_count = (
+            self.db.query(sql_func.count(Task.id))
+            .filter(Task.user_id == user_id, Task.status == TaskStatus.expired)
+            .scalar() or 0
+        )
+
+        active_count = (
+            self.db.query(sql_func.count(Task.id))
+            .filter(Task.user_id == user_id, Task.status == TaskStatus.active)
+            .scalar() or 0
+        )
+
+        # Average completion time (in hours)
+        completed_tasks = (
+            self.db.query(Task)
+            .filter(Task.user_id == user_id, Task.status == TaskStatus.completed)
+            .all()
+        )
+
+        avg_completion_time = None
+        if completed_tasks:
+            times = [t.time_to_complete for t in completed_tasks if t.time_to_complete]
+            if times:
+                avg_completion_time = sum(times) / len(times) / 3600  # Convert to hours
+
+        return {
+            "active": active_count,
+            "completed": completed_count,
+            "expired": expired_count,
+            "avg_completion_hours": avg_completion_time
+        }

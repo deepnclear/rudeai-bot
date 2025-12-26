@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     enable_metrics: bool = Field(default=True, env="ENABLE_METRICS")
     metrics_retention_days: int = Field(default=7, env="METRICS_RETENTION_DAYS")
 
+    # Task Scheduler
+    scheduler_test_mode: bool = Field(default=False, env="SCHEDULER_TEST_MODE")
+
     # PostgreSQL (for production)
     postgres_password: Optional[str] = Field(default=None, env="POSTGRES_PASSWORD")
 
