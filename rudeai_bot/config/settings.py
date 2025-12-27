@@ -22,7 +22,8 @@ class Settings(BaseSettings):
     openai_temperature: float = Field(default=0.7, env="OPENAI_TEMPERATURE")
 
     # Webhook Configuration
-    webhook_url: str = Field(..., env="WEBHOOK_URL")
+    # webhook_url is optional - Railway/Render auto-detect the domain
+    webhook_url: str = Field(default="http://localhost:8000", env="WEBHOOK_URL")
     webhook_secret: str = Field(..., env="WEBHOOK_SECRET")
     host: str = Field(default="0.0.0.0", env="HOST")
     port: int = Field(default=8000, env="PORT")

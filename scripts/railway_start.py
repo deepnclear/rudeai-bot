@@ -24,6 +24,7 @@ def setup_railway_environment():
     os.environ["RAILWAY_ENVIRONMENT"] = "production"
 
     # Ensure required environment variables
+    # Note: WEBHOOK_URL is optional - Railway auto-detects the domain
     required_vars = [
         "OPENAI_API_KEY",
         "TELEGRAM_BOT_TOKEN",
