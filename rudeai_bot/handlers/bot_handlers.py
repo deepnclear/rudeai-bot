@@ -391,6 +391,119 @@ class BotHandlers:
                 f"Error retrieving admin stats: {str(e)}"
             )
 
+    async def scheduler_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Admin-only command to view scheduler status"""
+        user = update.effective_user
+
+        # Admin user ID check
+        ADMIN_USER_ID = 1825306172
+
+        if user.id != ADMIN_USER_ID:
+            await update.message.reply_text(
+                "This command is for the bot admin only. Nice try."
+            )
+            logger.warning(f"Unauthorized scheduler access attempt by user {user.id} (@{user.username})")
+            return
+
+        try:
+            if not self.scheduler:
+                await update.message.reply_text(
+                    "❌ SCHEDULER NOT INITIALIZED\n\n"
+                    "The scheduler was never created. This is a critical bug."
+                )
+                logger.error("Scheduler command called but self.scheduler is None!")
+                return
+
+            # Scheduler status
+            is_running = self.scheduler.scheduler.running
+            all_jobs = self.scheduler.scheduler.get_jobs()
+            total_jobs = len(all_jobs)
+
+            # Group jobs by task
+            from collections import defaultdict
+            task_jobs = defaultdict(list)
+            expiry_jobs = []
+
+            for job in all_jobs:
+                if 'harassment' in job.id:
+                    task_id = int(job.id.split('_')[1])
+                    task_jobs[task_id].append(job)
+                elif 'expiry' in job.id:
+                    task_id = int(job.id.split('_')[1])
+                    expiry_jobs.append((task_id, job))
+
+            # Get test mode status
+            from rudeai_bot.config.settings import settings
+            test_mode = settings.scheduler_test_mode
+            mode_str = "TEST MODE (240x faster)" if test_mode else "PRODUCTION MODE"
+
+            # Format status message
+            status_lines = [
+                "⚙️ SCHEDULER STATUS\n",
+                "═══════════════════════",
+                f"Status: {'🟢 RUNNING' if is_running else '🔴 STOPPED'}",
+                f"Mode: {mode_str}",
+                f"Total jobs: {total_jobs}",
+                "",
+                f"📋 ACTIVE TASKS: {len(task_jobs)}",
+            ]
+
+            # Show details for each task with scheduled jobs
+            if task_jobs:
+                for task_id, jobs in sorted(task_jobs.items()):
+                    harassment_count = len(jobs)
+                    next_job = min(jobs, key=lambda j: j.next_run_time) if jobs else None
+
+                    if next_job and next_job.next_run_time:
+                        from datetime import datetime, timezone
+                        now = datetime.now(timezone.utc)
+                        time_until = next_job.next_run_time - now
+                        minutes_until = int(time_until.total_seconds() / 60)
+
+                        status_lines.append(
+                            f"  Task {task_id}: {harassment_count} job(s), "
+                            f"next in {minutes_until}min"
+                        )
+            else:
+                status_lines.append("  (No active tasks)")
+
+            status_lines.extend([
+                "",
+                f"⏱️  EXPIRY JOBS: {len(expiry_jobs)}",
+            ])
+
+            if expiry_jobs:
+                for task_id, job in expiry_jobs:
+                    if job.next_run_time:
+                        from datetime import datetime, timezone
+                        now = datetime.now(timezone.utc)
+                        time_until = job.next_run_time - now
+                        hours_until = time_until.total_seconds() / 3600
+                        status_lines.append(f"  Task {task_id}: expires in {hours_until:.1f}h")
+
+            status_lines.extend([
+                "",
+                "═══════════════════════",
+                f"Reminder counts tracked: {len(self.scheduler.reminder_counts)}",
+            ])
+
+            # Show next upcoming job
+            if all_jobs:
+                next_job = min(all_jobs, key=lambda j: j.next_run_time if j.next_run_time else datetime.max.replace(tzinfo=timezone.utc))
+                if next_job and next_job.next_run_time:
+                    status_lines.append(f"\n⏰ Next job: {next_job.id}")
+                    status_lines.append(f"   Runs at: {next_job.next_run_time}")
+
+            message = "\n".join(status_lines)
+            await update.message.reply_text(message)
+            logger.info(f"Admin {user.id} viewed scheduler status")
+
+        except Exception as e:
+            logger.error(f"Error getting scheduler status: {e}", exc_info=True)
+            await update.message.reply_text(
+                f"Error retrieving scheduler status: {str(e)}"
+            )
+
     async def list_tasks_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Show all active tasks"""
         user = update.effective_user

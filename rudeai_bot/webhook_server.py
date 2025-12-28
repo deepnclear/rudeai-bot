@@ -16,6 +16,7 @@ from slowapi.errors import RateLimitExceeded
 
 from rudeai_bot.config.settings import settings
 from rudeai_bot.services.ai_service import AIService
+from rudeai_bot.services.scheduler_service import TaskSchedulerService
 from rudeai_bot.handlers.bot_handlers import BotHandlers
 from rudeai_bot.database.base import engine, Base
 from rudeai_bot.utils.logger import setup_logging
@@ -31,6 +32,7 @@ class WebhookServer:
         self.ai_service = AIService()
         self.handlers = BotHandlers(self.ai_service)
         self.telegram_app = None
+        self.scheduler = None  # Will be initialized in _initialize_telegram_app
 
         # Rate limiting
         self.limiter = Limiter(key_func=get_remote_address)
@@ -102,6 +104,7 @@ class WebhookServer:
         application.add_handler(CommandHandler("stats", self.handlers.stats_command))
         application.add_handler(CommandHandler("rudeness", self.handlers.rudeness_command))
         application.add_handler(CommandHandler("admin", self.handlers.admin_command))
+        application.add_handler(CommandHandler("scheduler", self.handlers.scheduler_command))
 
         # Message handler (must be last)
         application.add_handler(
@@ -386,6 +389,21 @@ class WebhookServer:
 
             await self.telegram_app.start()
             logger.info("✅ Telegram app started")
+
+            # Initialize and start scheduler
+            logger.info("🔧 Initializing TaskSchedulerService...")
+            self.scheduler = TaskSchedulerService(self.telegram_app.bot)
+            self.handlers.set_scheduler(self.scheduler)
+            logger.info("✅ Scheduler connected to handlers")
+
+            logger.info("🚀 Starting task scheduler...")
+            self.scheduler.start()
+            logger.info("✅ Task scheduler started")
+
+            # Reschedule all active tasks
+            logger.info("♻️ Rescheduling all active tasks...")
+            await self.scheduler.reschedule_all_active_tasks()
+            logger.info("✅ Active tasks rescheduled")
 
             # Set up webhook
             await self.setup_webhook()
