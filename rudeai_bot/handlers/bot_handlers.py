@@ -311,6 +311,86 @@ class BotHandlers:
                 "Couldn't retrieve your stats. Even the database doesn't want to look."
             )
 
+    async def admin_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Admin-only command to view system-wide statistics"""
+        user = update.effective_user
+
+        # Admin user ID check
+        ADMIN_USER_ID = 1825306172
+
+        if user.id != ADMIN_USER_ID:
+            await update.message.reply_text(
+                "This command is for the bot admin only. Nice try."
+            )
+            logger.warning(f"Unauthorized admin access attempt by user {user.id} (@{user.username})")
+            return
+
+        try:
+            with get_db_context() as db:
+                from sqlalchemy import text, func
+                from rudeai_bot.models.user import User
+                from rudeai_bot.models.task import Task
+
+                # Total users
+                total_users = db.query(func.count(User.id)).scalar()
+
+                # Total tasks created
+                total_tasks = db.query(func.count(Task.id)).scalar()
+
+                # Tasks by status
+                active_tasks = db.query(func.count(Task.id)).filter(Task.status == 'active').scalar()
+                completed_tasks = db.query(func.count(Task.id)).filter(Task.status == 'completed').scalar()
+                expired_tasks = db.query(func.count(Task.id)).filter(Task.status == 'expired').scalar()
+
+                # Average task stats
+                avg_hate = db.query(func.avg(Task.hate_level)).scalar()
+                avg_priority = db.query(func.avg(Task.priority)).scalar()
+
+                # Recent activity
+                from datetime import datetime, timedelta, timezone
+                last_24h = datetime.now(timezone.utc) - timedelta(hours=24)
+                recent_tasks = db.query(func.count(Task.id)).filter(Task.created_at >= last_24h).scalar()
+                recent_completions = db.query(func.count(Task.id)).filter(
+                    Task.status == 'completed',
+                    Task.completed_at >= last_24h
+                ).scalar()
+
+            # Format admin stats message
+            stats_lines = [
+                "🔧 RUDE.AI ADMIN DASHBOARD\n",
+                "═══════════════════════",
+                "👥 USER STATS:",
+                f"  Total users: {total_users}",
+                "",
+                "📋 TASK STATS:",
+                f"  Total tasks created: {total_tasks}",
+                f"  Active tasks: {active_tasks}",
+                f"  Completed: {completed_tasks}",
+                f"  Expired: {expired_tasks}",
+                "",
+                "📊 TASK AVERAGES:",
+                f"  Avg hate level: {avg_hate:.1f}/5" if avg_hate else "  Avg hate level: N/A",
+                f"  Avg priority: {avg_priority:.1f}/5" if avg_priority else "  Avg priority: N/A",
+                "",
+                "🕐 LAST 24 HOURS:",
+                f"  Tasks created: {recent_tasks}",
+                f"  Tasks completed: {recent_completions}",
+                "",
+                "═══════════════════════",
+                f"Completion rate: {(completed_tasks/total_tasks*100):.1f}%" if total_tasks > 0 else "Completion rate: N/A",
+                f"Expiry rate: {(expired_tasks/total_tasks*100):.1f}%" if total_tasks > 0 else "Expiry rate: N/A"
+            ]
+
+            message = "\n".join(stats_lines)
+            await update.message.reply_text(message)
+            logger.info(f"Admin {user.id} viewed system stats")
+
+        except Exception as e:
+            logger.error(f"Error getting admin stats: {e}")
+            await update.message.reply_text(
+                f"Error retrieving admin stats: {str(e)}"
+            )
+
     async def list_tasks_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Show all active tasks"""
         user = update.effective_user

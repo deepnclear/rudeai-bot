@@ -101,6 +101,7 @@ class WebhookServer:
         application.add_handler(CommandHandler("list", self.handlers.list_tasks_command))
         application.add_handler(CommandHandler("stats", self.handlers.stats_command))
         application.add_handler(CommandHandler("rudeness", self.handlers.rudeness_command))
+        application.add_handler(CommandHandler("admin", self.handlers.admin_command))
 
         # Message handler (must be last)
         application.add_handler(
